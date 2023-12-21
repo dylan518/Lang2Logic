@@ -9,16 +9,18 @@ import functools
 #custom imports
 from .response_schema import ResponseSchema
 
-
 class DataManagement:
     _instance = None
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
+            print("Creating new instance of DataManagement")  # Debug print
             cls._instance = super(DataManagement, cls).__new__(cls)
-            # Initialize instance variables here
             cls._instance.initialize(*args, **kwargs)
+        else:
+            print("Using existing instance of DataManagement")  # Debug print
         return cls._instance
+
 
     def initialize(self):
         file_path_relative="app_data.json"
@@ -72,9 +74,9 @@ class DataManagement:
 
         # Check if the instructions key exists and has data
         try:
-            data.get('instructions')
+            data['instructions']
         except KeyError:
-            raise KeyError(f"Instructions key not found in the file. \nDATA: {data}")
+            raise KeyError(f"Instructions key not found in the file. \nDATA: {data}. File path: {self.file_path}")
         
         self.data=data
 
@@ -83,7 +85,7 @@ class DataManagement:
     @file_operation_wrapper
     def reset_data_except_instructions(self):
         self.load_data()
-        instructions = self.data.get('instructions')
+        instructions = self.data['instructions']
         self.data = self.initialize_data()
         self.data['instructions'] = instructions
         self.save_to_json()
@@ -109,7 +111,9 @@ class DataManagement:
             "code_errors": [],
             "warnings": [],
             "logs": [],
-            "instructions": None,
+            "instructions": {
+        "draft-7": "Given the desired output from the instructions generate a draft-7 schema. Example: instructions: create a list of strings where each string is a method in the a bankaccount class draft-7 schema/output: {\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"description\": \"A list of method names for a BankAccount class\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"string\"\n  }\n}"
+    },
             "fatal_errors": [],
             "draft_7_schema": None
         }
@@ -150,11 +154,11 @@ class DataManagement:
             self.data[message_type] = [entry]
 
     # Methods allowing edit and read access to data
-    
+    @error_handling
     def set_prompt(self, prompt):
         self.data['response_process']['prompt'] = prompt
 
-    
+    @error_handling
     def get_prompt(self):
         return self.data['response_process']["prompt"]
 
@@ -201,6 +205,7 @@ class DataManagement:
     
     @error_handling
     def validate_draft_7_schema(self,schema):
+        print(self.data)
         schema=ResponseSchema(schema)
         return schema.validate()
     
@@ -231,7 +236,7 @@ class DataManagement:
         """Retrieve instruction data based on a specific key."""
         try:
             # Retrieve instructions from data
-            instructions = self.data.get('instructions', {})
+            instructions = self.data["instructions"]
 
             # Check if the key exists in instructions
             if key in instructions:

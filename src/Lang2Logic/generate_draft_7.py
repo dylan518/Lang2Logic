@@ -191,8 +191,8 @@ class SchemaGenerator:
         )
         return prompt
     def validate_schema(self,output):
-        if not self.data_manager.validate_response(output):
-            self.data_manager.log_message("code_error",f"The validation allowed a non-valid response please contact dylanpwilson2005@gmail.com regarding the bug. fixed_output: {output} schema: {self.data_manager.get_draft_7_schema()}")
+        if not self.data_manager.validate_draft_7_schema(output.dict()):
+            self.data_manager.log_message("code_errors",f"The validation allowed a non-valid response please contact dylanpwilson2005@gmail.com regarding the bug. fixed_output: {output} schema: {self.data_manager.get_draft_7_schema()}")
             self.data_manager.log_fatal_error("The validation allowed a non-valid response please contact dylanpwilson2005@gmail.com regarding the bug")
             return False
         return True
@@ -207,7 +207,7 @@ class SchemaGenerator:
             if not _input or not prompt:
                 self.data_manager.log_fatal_error("Failed to get prompt")
         except Exception as e:
-            self.data_manager.log_message("code_error",f"Failed to construct query: {e}")
+            self.data_manager.log_message("code_errors",f"Failed to construct query: {e}")
             self.data_manager.log_fatal_error(f"Failed to construct query: {e}")
             
         try:
@@ -218,30 +218,35 @@ class SchemaGenerator:
             if response.generations:
                 output = response.generations[0][0].text  # Accessing the first Generation object's text
                 self.data_manager.log_schema_generation_message(output)
+                self.data_manager.log_schema_generation_message(output)
             else:
                 output = ""
                 self.data_manager.log_fatal_error("The language model did not generate output for the schema generation")
         except Exception as e:
-            self.data_manager.log_message("code_error",f"Failed to generate response from language model: {e}")
+            self.data_manager.log_message("warnings",f"Failed to generate response from language model: {e}")
             self.data_manager.log_fatal_error(f"Failed to generate response: {e}")
         
         
         try:
+            
             parsed_output = self.parser.parse(output)
+            self.data_manager.log_schema_generation_message(str(parsed_output.dict()))
             self.validate_schema(parsed_output)
-            self.data_manager.log_schema_generation_message(parsed_output)
-            self.data_manager.set_draft_7_schema(parsed_output)
+            print("check 1")
+            self.data_manager.set_draft_7_schema(parsed_output.to_json())
+            print(self.data_manager.get_draft_7_schema())
             return parsed_output
         except ValueError as e:
-            self.data_manager.log_message("warning",f"Failed to parse output during schema generation\n Error: {e}\nResponse: {output}")
+            self.data_manager.log_message("warnings",f"Failed to parse output during schema generation\n Error: {e}\nResponse: {output}")
             try:
                 fixed_output = self.fixer.parse(output)
                 parsed_output = self.parser.parse(fixed_output)
                 if not parsed_output:
                     self.data_manager.log_fatal_error(f"Failed to fix and parse output. Parsed output is empty. \nOutput:{output} \n Error: {e}")
-                self.data_manager.set_draft_7_schema(parsed_output)
-                self.data_manager.log_schema_generation_message(parsed_output)
+                self.data_manager.set_draft_7_schema(parsed_output.dict())
+                self.data_manager.log_schema_generation_message(fixed_output)
                 self.data_manager.validate_response()
+                print("check 2")
                 return self.parser.parse(parsed_output)
             except Exception as ex:
                 self.data_manager.log_fatal_error(f"Failed to fix and parse output. \nOutput:{output} \n Error: {ex}")

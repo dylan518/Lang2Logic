@@ -17,8 +17,7 @@ class TestSchemaGenerator(unittest.TestCase):
     def test_schema_for_list_of_strings(self):
         # Using a simple question that should result in a list of strings schema
         question = "return a list of colors"
-        schema = self.test_gen.generate_schema(question)
-        generated_schema = schema.to_json()
+        generated_schema = self.test_gen.generate_schema(question)
 
         self.assertIsNotNone(generated_schema, "Failed to generate JSON schema")
 
@@ -30,14 +29,9 @@ class TestSchemaGenerator(unittest.TestCase):
                 "type": "string"
             }
         }
-
-        try:
-            generated_schema_dict = json.loads(generated_schema)
-        except json.JSONDecodeError as e:
-            self.fail(f"Invalid JSON: {e}")
-
+        print(generated_schema)
         # Assert that the generated schema matches the expected schema
-        self.assertEqual(generated_schema_dict, expected_schema, "Generated schema does not match the expected schema for a list of strings")
+        self.assertEqual(generated_schema, expected_schema, "Generated schema does not match the expected schema for a list of strings")
 
 
 if __name__ == '__main__':

@@ -49,6 +49,7 @@ class Generator:
         self.data_manager.reset_data_except_instructions()
         self.data_manager.set_prompt(query)
         self.schema_generator.generate_draft_7()
+        return self.data_manager.get_draft_7_schema()
     
     def generate(self, query,schema=None):
         if schema:

@@ -189,6 +189,7 @@ class ResponseGenerator:
             self.data_manager.log_message("user_errors",f"Failed to parse output during response generation\n Error: {e}\nResponse: {output}")
             self.data_manager.log_message("logs",f"Failed to parse output during response generation\n Error: {e}\nResponse: {output}")
             try:
+                self.data_manager.log_message("logs",f"Failed to parse output during response generation\n Error: {e}\nResponse: {output}")
                 fixed_output = self.fixer.parse(output)
                 parsed_output = self.parser.parse(output)
                 if not self.data_manager.validate_draft_7_schema(fixed_output):
@@ -216,3 +217,5 @@ class ResponseGenerator:
         except Exception as e:
             self.data_manager.log_message("code_error",f"Failed to convert to desired object: {e}")
             self.data_manager.log_fatal_error(f"Failed to generate response: {e}")
+
+

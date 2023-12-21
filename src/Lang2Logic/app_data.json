@@ -1,10 +1,8 @@
 {
     "response_process": {
-        "prompt": "return a list of colors",
+        "prompt": "",
         "schema_generation": {
-            "messages": [
-                "Based on the task to return a list of colors, the draft-7 schema would look like this:\n\n```json\n{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"description\": \"A list of color names\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"string\"\n  }\n}\n```\n\nThis schema specifies that the data is an array where each item is a string, which in this context represents a color name."
-            ],
+            "messages": [],
             "tries": 0,
             "success": false
         },
@@ -23,11 +21,6 @@
     "instructions": {
         "draft-7": "Given the desired output from the instructions generate a draft-7 schema. Example: instructions: create a list of strings where each string is a method in the a bankaccount class draft-7 schema/output: {\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"description\": \"A list of method names for a BankAccount class\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"string\"\n  }\n}"
     },
-    "fatal_errors": [
-        {
-            "timestamp": "2023-12-20T17:39:58.226431",
-            "error_message": "Error in validate_response: No schema has been generated yet"
-        }
-    ],
+    "fatal_errors": [],
     "draft_7_schema": null
 }

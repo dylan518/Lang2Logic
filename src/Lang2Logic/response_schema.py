@@ -3,24 +3,29 @@ from jsonschema import validate, ValidationError
 from typing import Union, Dict, Any
 
 class ResponseSchema:
-    def __init__(self, data: Union[str, Dict[str, Any], 'ResponseSchema'], schema: Dict[str, Any]):
-        self.schema = schema
-
-        # Handle if the data is another ResponseSchema instance
+    def __init__(self, data: Union[str, Dict[str, Any], 'ResponseSchema']):
+        # If the data is another ResponseSchema instance, use its schema and data
         if isinstance(data, ResponseSchema):
+            self.schema = data.schema
             self.data = data.data
+        # If the data is a string, attempt to parse it as JSON
         elif isinstance(data, str):
             try:
-                self.data = json.loads(data)  # Attempt to parse JSON string
+                loaded_data = json.loads(data)
+                self.schema = loaded_data.get('schema', {})
+                self.data = loaded_data.get('data', {})
             except json.JSONDecodeError:
-                # If not JSON, treat as a regular string
-                self.data = data
+                # If not JSON, treat as invalid input
+                raise ValueError("String input must be valid JSON.")
+        # If the data is a dictionary, assume it's a combination of schema and data
         elif isinstance(data, dict):
-            self.data = data
+            self.schema = data.get('schema', {})
+            self.data = data.get('data', {})
         else:
-            raise TypeError("Data must be a JSON string, string, dictionary, or ResponseSchema instance")
+            raise TypeError("Data must be a JSON string, dictionary, or ResponseSchema instance")
 
-        self.validate()  # Automatically validate upon initialization
+        # Automatically validate upon initialization
+        self.validate()
 
     def validate(self) -> bool:
         """ Validates the data against the stored schema. """
