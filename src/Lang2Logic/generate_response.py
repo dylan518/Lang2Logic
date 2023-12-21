@@ -100,8 +100,6 @@ class ResponseGenerator:
                 temp_input.flush()
                 
                 output_file = Path(temp_input.name).with_suffix('.py')
-                print(f"Generating Pydantic model from schema: {temp_input.name} -> {output_file}")
-
                 # Run datamodel-codegen as a Python module
                 subprocess.run([
                     'python', '-m', 'datamodel_code_generator',
@@ -143,12 +141,14 @@ class ResponseGenerator:
     
         
     def generate_response(self,schema=None):
+        if not self.data_manager.get_prompt():
+            self.data_manager.log_fatal_error("No prompt provided")
         if schema:
             if not isinstance(schema, ResponseSchema):
-                self.data_manager.log_message("code_error",f"f{schema} is not a valid schema")
+                self.data_manager.log_message("code_errors",f"f{schema} is not a valid schema")
                 self.data_manager.log_fatal_error("Invalid schema used as paramater for generate_response report error to dylanpwilson2005@gmail.com")
         else:
-            self.data_manager.log_message("code_error","No schema provided generating schema")
+            self.data_manager.log_message("code_errors","No schema provided generating schema")
             self.data_manager.log_fatal_error("Nonetype. Invalid schema used as paramater for generate_response report error to dylanpwilson2005@gmail.com")
             
         # Load the schema into a Pydantic model
@@ -162,7 +162,7 @@ class ResponseGenerator:
             #make request
             _input = prompt.format_prompt(query=self.data_manager.get_prompt())
         except Exception as e:
-            self.data_manager.log_message("code_error",f"Failed to construct query: {e}")
+            self.data_manager.log_message("code_errors",f"Failed to construct query: {e}")
             self.data_manager.log_fatal_error(f"Failed to construct query: {e}")
             
         try:
@@ -173,33 +173,36 @@ class ResponseGenerator:
             if response.generations:
                 output = response.generations[0][0].text  # Accessing the first Generation object's text
                 self.data_manager.log_schema_generation_message(output)
+                self.data_manager.log_schema_generation_message(output)
             else:
                 output = ""
                 self.data_manager.log_fatal_error("The language model did not generate output for the schema generation")
         except Exception as e:
-            self.data_manager.log_message("code_error",f"Failed to generate response from language model: {e}")
+            self.data_manager.log_message("warnings",f"Failed to generate response from language model: {e}")
             self.data_manager.log_fatal_error(f"Failed to generate response: {e}")
         
-        
         try:
+            
             parsed_output = self.parser.parse(output)
+            dict_output = parsed_output.model_dump()
+            self.data_manager.log_schema_generation_message(dict_output)
+            self.data_manager.set_response(dict_output)
             return parsed_output
         except ValueError as e:
-            self.data_manager.log_message("warning",f"Failed to parse output during response generation\n Error: {e}\nResponse: {output}")
-            self.data_manager.log_message("user_errors",f"Failed to parse output during response generation\n Error: {e}\nResponse: {output}")
-            self.data_manager.log_message("logs",f"Failed to parse output during response generation\n Error: {e}\nResponse: {output}")
+            self.data_manager.log_message("warnings",f"Failed to parse output during schema generation\n Error: {e}\nResponse: {output}")
             try:
-                self.data_manager.log_message("logs",f"Failed to parse output during response generation\n Error: {e}\nResponse: {output}")
                 fixed_output = self.fixer.parse(output)
-                parsed_output = self.parser.parse(output)
-                if not self.data_manager.validate_draft_7_schema(fixed_output):
-                    self.data_manager.log_message("code_error","The validation allowed a non-valid response please contact dylanpwilson2005@gmail.com regarding the bug")
-                    self.data_manager.log_fatal_error("The validation allowed a non-valid response please contact dylanpwilson2005@gmail.com regarding the bug")
-                self.data_manager.set_draft_7_schema(parsed_output)
-                return self.parser.parse(fixed_output)
+                parsed_output = self.parser.parse(fixed_output)
+                dict_output = parsed_output.model_dump()
+                if not parsed_output:
+                    self.data_manager.log_fatal_error(f"Failed to fix and parse output. Parsed output is empty. \nOutput:{output} \n Error: {e}")
+                self.data_manager.set_response(dict_output)
+                self.data_manager.log_response_generation_message(dict_output)
+                return self.parser.parse(parsed_output)
             except Exception as ex:
                 self.data_manager.log_fatal_error(f"Failed to fix and parse output. \nOutput:{output} \n Error: {ex}")
         return None  
+     
 
     
     def generate(self,request):
@@ -215,7 +218,7 @@ class ResponseGenerator:
                 return model_dump['root']
             return model_dump
         except Exception as e:
-            self.data_manager.log_message("code_error",f"Failed to convert to desired object: {e}")
+            self.data_manager.log_message("code_errors",f"Failed to convert to desired object: {e}")
             self.data_manager.log_fatal_error(f"Failed to generate response: {e}")
 
 

@@ -1,6 +1,8 @@
 import os
 from langchain_community.chat_models import ChatOpenAI
 from langchain.llms import OpenAI
+import warnings
+
 
 
 #custom imports
@@ -8,6 +10,30 @@ from .generate_draft_7 import SchemaGenerator
 from .generate_response import ResponseGenerator
 from .response_schema import ResponseSchema
 from .data_manager import DataManagement
+
+#suprress warnings
+# Suppress PydanticDeprecatedSince20 warnings from pydantic module
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic.*")
+
+# Suppress UserWarning from langchain_community.llms.openai module
+warnings.filterwarnings("ignore", category=UserWarning, module="langchain_community.llms.openai")
+
+# Suppress DeprecationWarning from langchain_core.prompts.prompt module
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="langchain_core.prompts.prompt")
+
+# Suppress PydanticDeprecatedSince20 warnings from langchain.output_parsers.pydantic module
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="langchain.output_parsers.pydantic")
+
+# Suppress PydanticDeprecatedSince20 warnings from langchain.output_parsers.pydantic module
+warnings.filterwarnings("ignore", category=DeprecationWarning, 
+                        message=".*`pydantic.config.Extra` is deprecated.*",
+                        module='pydantic.*')
+
+
+# Suppress PydanticDeprecatedSince20 warnings from pydantic.main module
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic.main")
+
+
 
 class Generator:
     def __init__(self, api_key):
@@ -51,13 +77,13 @@ class Generator:
         self.schema_generator.generate_draft_7()
         return self.data_manager.get_draft_7_schema()
     
-    def generate(self, query,schema=None):
-        if schema:
+    def generate(self, query, schema=None):
+        if schema is not None:
             self.data_manager.reset_data_except_instructions()
             self.data_manager.set_prompt(query)
             if not self.set_schema(schema):
-                self.data_manager.log_fatal_error("Invalid schema used as paramater for generate_response")
+                self.data_manager.log_fatal_error("Invalid schema used as parameter for generate_response")
         else:
-            self.generate_schema(query)
-        return self.ResponseGenerator.generate(query,self.data_manager.get_draft_7_schema())
+            schema=ResponseSchema(self.generate_schema(query))
+        return self.ResponseGenerator.generate(schema)
 

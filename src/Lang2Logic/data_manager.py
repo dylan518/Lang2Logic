@@ -3,6 +3,8 @@ import os
 from datetime import datetime
 import warnings
 from jsonschema import validate
+from jsonschema import Draft7Validator
+
 import jsonschema
 import functools
 
@@ -14,11 +16,8 @@ class DataManagement:
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
-            print("Creating new instance of DataManagement")  # Debug print
             cls._instance = super(DataManagement, cls).__new__(cls)
             cls._instance.initialize(*args, **kwargs)
-        else:
-            print("Using existing instance of DataManagement")  # Debug print
         return cls._instance
 
 
@@ -59,7 +58,7 @@ class DataManagement:
                 return method(self, *args, **kwargs)
             except Exception as e:
                 self.log_fatal_error(f"Error in {method.__name__}: {str(e)}")
-                return None  # Re-raise the exception for further handling or termination
+                raise  # Re-raise the exception for further handling or termination
         return wrapper
     
     @file_operation_wrapper
@@ -135,7 +134,6 @@ class DataManagement:
         error_entry = {"timestamp": timestamp, "error_message": error_message}
         self.data['fatal_errors'].append(error_entry)
         self.save_to_json()
-        print(f"Fatal error encountered: {error_message}")
         raise Exception(error_message)
     
     @error_handling
@@ -205,14 +203,21 @@ class DataManagement:
     
     @error_handling
     def validate_draft_7_schema(self,schema):
-        print(self.data)
         schema=ResponseSchema(schema)
-        return schema.validate()
+        return schema.validate_schema()
     
     @error_handling
     def load_response_schema(self,schema):
         return ResponseSchema(schema)
     
+    @error_handling
+    def get_response(self,schema):
+        return self.data['response_process']['response_generation']['Response']
+    
+    @error_handling
+    def set_response(self,Response):
+        self.data['response_process']['response_generation']['Response']=Response
+
     @error_handling
     def get_response_schema_dict(self,schema):
         return ResponseSchema(schema).to_dict()
@@ -222,13 +227,12 @@ class DataManagement:
         if not self.get_draft_7_schema():
             raise ValueError("No schema has been generated yet")
         try:
-            schema=ResponseSchema(self.get_draft_7_schema()).to_dict
+            schema=ResponseSchema(self.get_draft_7_schema())
         except:
             raise ValueError("Invalid schema")
-        try:
-            validate(instance=response, schema=schema)
+        if schema.validate():
             return True
-        except jsonschema.exceptions.ValidationError as e:
+        else:
             return False
         
     @error_handling
@@ -245,10 +249,9 @@ class DataManagement:
                 raise KeyError(f"Key '{key}' not found in instructions.")
         
         except KeyError as e:
-            print(f"Error: {e}")
+            
             # Optionally, handle the KeyError further or re-raise it
-            raise
+            raise KeyError(f"Error: {e}")
         except Exception as e:
-            print(f"An unexpected error occurred: {e}")
             # Handle any other exceptions
-            raise
+            raise Exception(f"Error: {e}")

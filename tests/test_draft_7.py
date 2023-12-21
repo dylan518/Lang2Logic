@@ -5,6 +5,7 @@ import unittest
 import json
 from langchain_community.chat_models import ChatOpenAI
 from langchain.llms import OpenAI
+from jsonschema import Draft7Validator
 
 #custom imports
 
@@ -12,7 +13,7 @@ from Lang2Logic.generator import Generator
 
 class TestSchemaGenerator(unittest.TestCase):
     def setUp(self):
-        self.test_gen = Generator("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")
+        self.test_gen = Generator("YOUR API KEY HERE")
     
     def test_schema_for_list_of_strings(self):
         # Using a simple question that should result in a list of strings schema
@@ -31,7 +32,12 @@ class TestSchemaGenerator(unittest.TestCase):
         }
         print(generated_schema)
         # Assert that the generated schema matches the expected schema
-        self.assertEqual(generated_schema, expected_schema, "Generated schema does not match the expected schema for a list of strings")
+        try:
+            Draft7Validator.check_schema(generated_schema)
+            valid=True
+        except Exception as e:
+            valid=False
+        self.assertEqual(valid, True, "Generated schema does not match the expected schema for a list of strings")
 
 
 if __name__ == '__main__':

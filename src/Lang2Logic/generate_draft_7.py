@@ -143,11 +143,11 @@ class Draft7Schema(BaseModel):
         extra = 'allow'
         populate_by_name = True
         json_encoders = {
-            'SchemaProperty': lambda v: v.dict(by_alias=True)
+            'SchemaProperty': lambda v: v.dict(by_alias=True,)
         }
 
     def dict(self, **kwargs):
-        return super().model_dump(**kwargs, by_alias=True)
+        return super().model_dump(**kwargs, by_alias=True,exclude_none=True)
 
     def __init__(self, **data):
         # Perform JSON Schema Draft-7 validation on the input data
@@ -191,7 +191,7 @@ class SchemaGenerator:
         )
         return prompt
     def validate_schema(self,output):
-        if not self.data_manager.validate_draft_7_schema(output.dict()):
+        if not self.data_manager.validate_draft_7_schema(output):
             self.data_manager.log_message("code_errors",f"The validation allowed a non-valid response please contact dylanpwilson2005@gmail.com regarding the bug. fixed_output: {output} schema: {self.data_manager.get_draft_7_schema()}")
             self.data_manager.log_fatal_error("The validation allowed a non-valid response please contact dylanpwilson2005@gmail.com regarding the bug")
             return False
@@ -230,24 +230,24 @@ class SchemaGenerator:
         try:
             
             parsed_output = self.parser.parse(output)
-            self.data_manager.log_schema_generation_message(str(parsed_output.dict()))
-            self.validate_schema(parsed_output)
-            print("check 1")
-            self.data_manager.set_draft_7_schema(parsed_output.to_json())
-            print(self.data_manager.get_draft_7_schema())
-            return parsed_output
+            dict_output=parsed_output.model_dump()
+            self.data_manager.log_schema_generation_message(str(dict_output))
+            self.validate_schema(dict_output)
+            self.data_manager.set_draft_7_schema(dict_output)
+            return dict_output
         except ValueError as e:
             self.data_manager.log_message("warnings",f"Failed to parse output during schema generation\n Error: {e}\nResponse: {output}")
             try:
                 fixed_output = self.fixer.parse(output)
                 parsed_output = self.parser.parse(fixed_output)
+                dict_output=parsed_output.model_dump()
                 if not parsed_output:
                     self.data_manager.log_fatal_error(f"Failed to fix and parse output. Parsed output is empty. \nOutput:{output} \n Error: {e}")
-                self.data_manager.set_draft_7_schema(parsed_output.dict())
                 self.data_manager.log_schema_generation_message(fixed_output)
-                self.data_manager.validate_response()
-                print("check 2")
-                return self.parser.parse(parsed_output)
+                print(parsed_output.to_json())
+                self.validate_schema(dict_output)
+                self.data_manager.set_draft_7_schema(parsed_output)
+                return dict_output
             except Exception as ex:
                 self.data_manager.log_fatal_error(f"Failed to fix and parse output. \nOutput:{output} \n Error: {ex}")
         return None  

@@ -8,13 +8,11 @@ import os
 from Lang2Logic.generator import Generator
 
 
-"""
-
 
 
 class TestGenerator(unittest.TestCase):
     def setUp(self):
-        api_key = "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"
+        api_key = "YOUR_API_KEY_HERE"
         self.test_gen = Generator(api_key)
 
     def test_generate_integers(self):
@@ -28,4 +26,3 @@ class TestGenerator(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-"""
