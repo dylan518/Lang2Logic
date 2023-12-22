@@ -25,9 +25,10 @@ class DataManagement:
         file_path_relative="app_data.json"
         dir_path = os.path.dirname(os.path.realpath(__file__))
         self.file_path = os.path.join(dir_path, file_path_relative)
-
+        self.data=None
+        self.reset_data_except_instructions()
         # Load data from the file
-        self.data = self.load_data()
+        
     
     def file_operation_wrapper(method):
         @functools.wraps(method)
@@ -42,13 +43,7 @@ class DataManagement:
                 raise Exception(f"Error during file operation ({self.file_path}): {str(e)}")
         return wrapper
 
-    @staticmethod
-    def save_before_execution(method):
-        """Decorator to save data to JSON before method execution."""
-        def wrapper(self, *args, **kwargs):
-            self.save_to_json()  # Save current state before changes
-            return method(self, *args, **kwargs)  # Execute the actual method
-        return wrapper
+
     
     @staticmethod
     def error_handling(method):
@@ -61,33 +56,9 @@ class DataManagement:
                 raise  # Re-raise the exception for further handling or termination
         return wrapper
     
-    @file_operation_wrapper
-    def load_data(self):
-        # Check if the file exists
-        if not os.path.exists(self.file_path):
-            raise FileNotFoundError(f"The file {self.file_path} does not exist. Please re-install the python package Lang2Logic as the app data cannot be found.")
-
-        with open(self.file_path, 'r') as file:
-            data = json.load(file)
-        
-
-        # Check if the instructions key exists and has data
-        try:
-            data['instructions']
-        except KeyError:
-            raise KeyError(f"Instructions key not found in the file. \nDATA: {data}. File path: {self.file_path}")
-        
-        self.data=data
-
-        return data
-
-    @file_operation_wrapper
     def reset_data_except_instructions(self):
-        self.load_data()
-        instructions = self.data['instructions']
         self.data = self.initialize_data()
-        self.data['instructions'] = instructions
-        self.save_to_json()
+
     @file_operation_wrapper
     def initialize_data(self):
         return {
@@ -127,13 +98,11 @@ class DataManagement:
             raise OSError(f"Failed to save data to JSON. Error: {e}\n Data: {self.data}\n File path: {self.file_path}")
     
 
-    @save_before_execution
     def log_fatal_error(self, error_message):
 
         timestamp = datetime.now().isoformat()
         error_entry = {"timestamp": timestamp, "error_message": error_message}
         self.data['fatal_errors'].append(error_entry)
-        self.save_to_json()
         raise Exception(error_message)
     
     @error_handling
@@ -204,6 +173,7 @@ class DataManagement:
     @error_handling
     def validate_draft_7_schema(self,schema):
         schema=ResponseSchema(schema)
+        print(f"SCHEMA {schema.to_dict()})")
         return schema.validate_schema()
     
     @error_handling

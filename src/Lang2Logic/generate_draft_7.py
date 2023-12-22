@@ -230,7 +230,7 @@ class SchemaGenerator:
         try:
             
             parsed_output = self.parser.parse(output)
-            dict_output=parsed_output.model_dump()
+            dict_output=parsed_output.dict()
             self.data_manager.log_schema_generation_message(str(dict_output))
             self.validate_schema(dict_output)
             self.data_manager.set_draft_7_schema(dict_output)
@@ -240,11 +240,10 @@ class SchemaGenerator:
             try:
                 fixed_output = self.fixer.parse(output)
                 parsed_output = self.parser.parse(fixed_output)
-                dict_output=parsed_output.model_dump()
+                dict_output=parsed_output.dict()
                 if not parsed_output:
                     self.data_manager.log_fatal_error(f"Failed to fix and parse output. Parsed output is empty. \nOutput:{output} \n Error: {e}")
                 self.data_manager.log_schema_generation_message(fixed_output)
-                print(parsed_output.to_json())
                 self.validate_schema(dict_output)
                 self.data_manager.set_draft_7_schema(parsed_output)
                 return dict_output

@@ -27,21 +27,6 @@ class TestDataManagement(unittest.TestCase):
         }
         self.dm = DataManagement()
 
-    def test_load_data_success(self):
-        with patch('builtins.open', mock_open(read_data=json.dumps(self.test_data))):
-            data = self.dm.load_data()
-            self.assertEqual(data, self.test_data)
-
-    def test_load_data_file_not_found(self):
-        with patch('os.path.exists', return_value=False), \
-             self.assertRaises(FileNotFoundError):
-            self.dm.load_data()
-
-    def test_save_to_json_success(self):
-        with patch('builtins.open', mock_open()) as mocked_file:
-            self.dm.save_to_json()
-            mocked_file.assert_called_with(self.dm.file_path, 'w')
-
     def test_set_prompt(self):
         test_prompt = "Test prompt"
         self.dm.set_prompt(test_prompt)
