@@ -31,13 +31,8 @@ class TestSchemaGenerator(unittest.TestCase):
             }
         }
         print(generated_schema)
-        # Assert that the generated schema matches the expected schema
-        try:
-            Draft7Validator.check_schema(generated_schema)
-            valid=True
-        except Exception as e:
-            valid=False
-        self.assertEqual(valid, True, "Generated schema does not match the expected schema for a list of strings")
+        
+        self.assertEqual(generated_schema.validate_schema(), True, "Generated schema does not match the expected schema for a list of strings")
 
 
 if __name__ == '__main__':

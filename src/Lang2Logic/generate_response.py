@@ -5,7 +5,7 @@ from langchain.prompts import PromptTemplate
 from pydantic import ValidationError
 from pathlib import Path
 import subprocess
-from langchain.output_parsers import OutputFixingParser, PydanticOutputParser
+from langchain.output_parsers import OutputFixingParser, PydanticOutputParser, RetryWithErrorOutputParser
 
 
 #custom imports
@@ -31,6 +31,7 @@ class ResponseGenerator:
             try:
                 self.parser = PydanticOutputParser(pydantic_object=self.generated_pydantic_model)
                 self.fixer = OutputFixingParser.from_llm(parser=self.parser, llm=self.chat_model)
+                self.retry_parser=RetryWithErrorOutputParser.from_llm(parser=self.parser, llm=self.chat_model)
             except Exception as e:
                 self.data_manager.log_message("code_error",f"Failed to generate parsers: {e}")
                 self.data_manager.log_message("user_error",f"Failed to generate parsers: {e}")
@@ -139,8 +140,68 @@ class ResponseGenerator:
             )
         return prompt
     
+    def un_wrap_dict(self,dict_object):
+        """
+        Extracts internal data from a Pydantic model dump.
+        If the model dump contains a 'root' key, it returns the value of 'root'.
+        Otherwise, it returns the entire model dump.
+        """
+        try:
+            if 'root' in dict_object and isinstance(dict_object['root'], list):
+                return dict_object['root']
+            return dict_object
+        except Exception as e:
+            self.data_manager.log_message("code_errors",f"Failed to convert to desired object: {e}")
+            self.data_manager.log_fatal_error(f"Failed to generate response: {e}")
+    
+    def handle_output(self,parsed_output):
+        if not parsed_output:
+            self.data_manager.log_fatal_error("Parsed output is empty")
+        try:
+            dict_output = self.un_wrap_dict(parsed_output.model_dump())
+            self.data_manager.log_schema_generation_message(dict_output)
+            self.data_manager.set_response(dict_output)
+            return dict_output
+        except Exception as e:
+            raise Exception (f"Failed to convert to desired object and handle parsed output: {e}")
+    
         
-    def generate_response(self,schema=None):
+    def retry_with_error(self,output):
+        try:
+            prompt=self.data_manager.get_prompt()
+            if not prompt:
+                self.data_manager.log_fatal_error("Failed to get prompt. Value is None")
+        except ValueError as e:
+            self.data_manager.log_fatal_error(f"Failed to get prompt: {e}")
+        try:
+            response=self.retry_parse(output, prompt)
+            self.handle_output(response)
+        except Exception as e:
+            self.data_manager.log_fatal_error(f"Failed to retry parse: {e}")
+        
+
+
+        
+    def retry_parse(self,output):
+        try:
+            parsed_output = self.parser.parse(output)
+            dict_output=self.handle_output(parsed_output)
+            return dict_output
+        except ValueError as e:
+            self.data_manager.log_message("warnings",f"Failed to parse output during schema generation\n Error: {e}\nResponse: {output}")
+            try:
+                fixed_output = self.fixer.parse(output)
+                self.handle_output(fixed_output)
+            except Exception as ex:
+                self.data_manager.log_message("warnings",f"Failed to parse output after fixing output during schema generation. \n Error: {e}\nResponse: {output}")
+                try:
+                    self.retry_with_error(output)
+                except Exception as ex:
+                    self.data_manager.log_fatal_error(f"Failed to fix and parse output with prompt. \nOutput:{output} \n Error: {ex}")
+        return None
+        
+        
+    def generate(self,prompt,schema=None):
         if not self.data_manager.get_prompt():
             self.data_manager.log_fatal_error("No prompt provided")
         if schema:
@@ -181,44 +242,10 @@ class ResponseGenerator:
             self.data_manager.log_message("warnings",f"Failed to generate response from language model: {e}")
             self.data_manager.log_fatal_error(f"Failed to generate response: {e}")
         
-        try:
-            
-            parsed_output = self.parser.parse(output)
-            dict_output = parsed_output.model_dump()
-            self.data_manager.log_schema_generation_message(dict_output)
-            self.data_manager.set_response(dict_output)
-            return parsed_output
-        except ValueError as e:
-            self.data_manager.log_message("warnings",f"Failed to parse output during schema generation\n Error: {e}\nResponse: {output}")
-            try:
-                fixed_output = self.fixer.parse(output)
-                parsed_output = self.parser.parse(fixed_output)
-                dict_output = parsed_output.model_dump()
-                if not parsed_output:
-                    self.data_manager.log_fatal_error(f"Failed to fix and parse output. Parsed output is empty. \nOutput:{output} \n Error: {e}")
-                self.data_manager.set_response(dict_output)
-                self.data_manager.log_response_generation_message(dict_output)
-                return self.parser.parse(parsed_output)
-            except Exception as ex:
-                self.data_manager.log_fatal_error(f"Failed to fix and parse output. \nOutput:{output} \n Error: {ex}")
-        return None  
+        return self.retry_parse(output)
      
 
     
-    def generate(self,request):
-        """
-        Extracts internal data from a Pydantic model dump.
-        If the model dump contains a 'root' key, it returns the value of 'root'.
-        Otherwise, it returns the entire model dump.
-        """
-        pydantic_object=self.generate_response(request)
-        try:
-            model_dump = pydantic_object.model_dump()
-            if 'root' in model_dump and isinstance(model_dump['root'], list):
-                return model_dump['root']
-            return model_dump
-        except Exception as e:
-            self.data_manager.log_message("code_errors",f"Failed to convert to desired object: {e}")
-            self.data_manager.log_fatal_error(f"Failed to generate response: {e}")
+
 
 

@@ -168,12 +168,11 @@ class DataManagement:
     
     @error_handling
     def get_draft_7_schema(self):
-        return self.data['draft_7_schema']
+        return ResponseSchema(self.data['draft_7_schema'])
     
     @error_handling
     def validate_draft_7_schema(self,schema):
         schema=ResponseSchema(schema)
-        print(f"SCHEMA {schema.to_dict()})")
         return schema.validate_schema()
     
     @error_handling
@@ -200,7 +199,7 @@ class DataManagement:
             schema=ResponseSchema(self.get_draft_7_schema())
         except:
             raise ValueError("Invalid schema")
-        if schema.validate():
+        if schema.validate_schema():
             return True
         else:
             return False

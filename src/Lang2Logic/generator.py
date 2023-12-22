@@ -64,7 +64,7 @@ class Generator:
 
     def set_schema(self, schema):
         Unverified_Schema= ResponseSchema(schema)
-        if Unverified_Schema.validate():
+        if Unverified_Schema.validate_schema():
             self.data_manager.set_draft_7_schema(Unverified_Schema)
             return True
         else:
@@ -75,7 +75,10 @@ class Generator:
         self.data_manager.reset_data_except_instructions()
         self.data_manager.set_prompt(query)
         self.schema_generator.generate_draft_7()
-        return self.data_manager.get_draft_7_schema()
+        schema=ResponseSchema(self.data_manager.get_draft_7_schema())
+        print(schema)   
+        print(f"Type gen{str(type(schema))}")
+        return schema
     
     def generate(self, query, schema=None):
         if schema is not None:
@@ -84,6 +87,6 @@ class Generator:
             if not self.set_schema(schema):
                 self.data_manager.log_fatal_error("Invalid schema used as parameter for generate_response")
         else:
-            schema=ResponseSchema(self.generate_schema(query))
-        return self.ResponseGenerator.generate(schema)
+            schema=self.generate_schema(query)
+        return self.ResponseGenerator.generate(query,schema)
 

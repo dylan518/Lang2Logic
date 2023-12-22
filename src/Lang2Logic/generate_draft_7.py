@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from jsonschema import Draft7Validator, exceptions as jsonschema_exceptions
 
 from langchain.llms import OpenAI
-from langchain.output_parsers import OutputFixingParser, PydanticOutputParser
+from langchain.output_parsers import OutputFixingParser, PydanticOutputParser, RetryWithErrorOutputParser
 from langchain.prompts import PromptTemplate
 
 #custom imports
@@ -177,6 +177,7 @@ class SchemaGenerator:
         self.chat_model=chat_model
         self.parser = PydanticOutputParser(pydantic_object=Draft7Schema)
         self.fixer = OutputFixingParser.from_llm(parser=self.parser, llm=self.chat_model)
+        self.retry_parser=RetryWithErrorOutputParser.from_llm(parser=self.parser, llm=self.chat_model)
         self.data_manager=DataManagement()
 
     def construct_template(self):
@@ -196,6 +197,50 @@ class SchemaGenerator:
             self.data_manager.log_fatal_error("The validation allowed a non-valid response please contact dylanpwilson2005@gmail.com regarding the bug")
             return False
         return True
+    
+    def handle_output(self,output):
+        dict_output=output.dict()
+        if not dict_output:
+            raise ValueError("Schema is empty")  
+        self.data_manager.log_schema_generation_message(str(dict_output))
+        if not self.validate_schema(dict_output):
+            raise ValueError("Invalid schema")            
+        self.data_manager.set_draft_7_schema(dict_output)
+        return dict_output
+    
+    def retry_with_error(self,output):
+        try:
+            prompt=self.data_manager.get_prompt()
+            if not prompt:
+                self.data_manager.log_fatal_error("Failed to get prompt. Value is None")
+        except ValueError as e:
+            self.data_manager.log_fatal_error(f"Failed to get prompt: {e}")
+        try:
+            response=self.retry_parse(output, prompt)
+            self.handle_output(response)
+        except Exception as e:
+            self.data_manager.log_fatal_error(f"Failed to retry parse: {e}")
+        
+
+
+        
+    def retry_parse(self,output):
+        try:
+            parsed_output = self.parser.parse(output)
+            dict_output=self.handle_output(parsed_output)
+            return dict_output
+        except ValueError as e:
+            self.data_manager.log_message("warnings",f"Failed to parse output during schema generation\n Error: {e}\nResponse: {output}")
+            try:
+                fixed_output = self.fixer.parse(output)
+                self.handle_output(fixed_output)
+            except Exception as ex:
+                self.data_manager.log_message("warnings",f"Failed to parse output after fixing output during schema generation. \n Error: {e}\nResponse: {output}")
+                try:
+                    self.retry_with_error(output)
+                except Exception as ex:
+                    self.data_manager.log_fatal_error(f"Failed to fix and parse output with prompt. \nOutput:{output} \n Error: {ex}")
+        return None
         
     def generate_draft_7(self):
         try:
@@ -227,29 +272,7 @@ class SchemaGenerator:
             self.data_manager.log_fatal_error(f"Failed to generate response: {e}")
         
         
-        try:
-            
-            parsed_output = self.parser.parse(output)
-            dict_output=parsed_output.dict()
-            self.data_manager.log_schema_generation_message(str(dict_output))
-            self.validate_schema(dict_output)
-            self.data_manager.set_draft_7_schema(dict_output)
-            return dict_output
-        except ValueError as e:
-            self.data_manager.log_message("warnings",f"Failed to parse output during schema generation\n Error: {e}\nResponse: {output}")
-            try:
-                fixed_output = self.fixer.parse(output)
-                parsed_output = self.parser.parse(fixed_output)
-                dict_output=parsed_output.dict()
-                if not parsed_output:
-                    self.data_manager.log_fatal_error(f"Failed to fix and parse output. Parsed output is empty. \nOutput:{output} \n Error: {e}")
-                self.data_manager.log_schema_generation_message(fixed_output)
-                self.validate_schema(dict_output)
-                self.data_manager.set_draft_7_schema(parsed_output)
-                return dict_output
-            except Exception as ex:
-                self.data_manager.log_fatal_error(f"Failed to fix and parse output. \nOutput:{output} \n Error: {ex}")
-        return None  
+        return self.retry_parse(output)
     
 
 
