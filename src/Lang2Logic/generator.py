@@ -76,8 +76,6 @@ class Generator:
         self.data_manager.set_prompt(query)
         self.schema_generator.generate_draft_7()
         schema=ResponseSchema(self.data_manager.get_draft_7_schema())
-        print(schema)   
-        print(f"Type gen{str(type(schema))}")
         return schema
     
     def generate(self, query, schema=None):

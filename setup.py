@@ -9,7 +9,7 @@ with open('README.md', 'r', encoding='utf-8') as f:
 
 setup(
     name='Lang2Logic',  
-    version='0.1.3',
+    version='0.1.4',
     description='A package for generating, validating, and utilizing Draft-7 JSON schemas with LangChain',
     long_description=long_description,
     long_description_content_type='text/markdown',

@@ -11,7 +11,7 @@ from Lang2Logic.response_schema import ResponseSchema
 class TestSchemaUsage(unittest.TestCase):
 
     def setUp(self):
-        api_key = "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"
+        api_key = "YOUR_API_KEY_HERE"
         self.test_gen = Generator(api_key)
         self.schema=None
     def test_schema_is_valid_json(self):
