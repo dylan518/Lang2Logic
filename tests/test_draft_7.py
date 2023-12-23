@@ -13,7 +13,7 @@ from Lang2Logic.generator import Generator
 
 class TestSchemaGenerator(unittest.TestCase):
     def setUp(self):
-        self.test_gen = Generator("YOUR_API_KEY_HERE")
+        self.test_gen = Generator("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")
     
     def test_schema_for_list_of_strings(self):
         # Using a simple question that should result in a list of strings schema

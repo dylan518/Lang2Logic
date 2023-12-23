@@ -10,6 +10,8 @@ from .generate_draft_7 import SchemaGenerator
 from .generate_response import ResponseGenerator
 from .response_schema import ResponseSchema
 from .data_manager import DataManagement
+from .model_unwrap import SchemaModelUnwrapper
+
 
 #suprress warnings
 # Suppress PydanticDeprecatedSince20 warnings from pydantic module
@@ -76,6 +78,7 @@ class Generator:
         self.data_manager.set_prompt(query)
         self.schema_generator.generate_draft_7()
         schema=ResponseSchema(self.data_manager.get_draft_7_schema())
+        self.data_manager.pretty_print()
         return schema
     
     def generate(self, query, schema=None):
@@ -86,5 +89,13 @@ class Generator:
                 self.data_manager.log_fatal_error("Invalid schema used as parameter for generate_response")
         else:
             schema=self.generate_schema(query)
-        return self.ResponseGenerator.generate(query,schema)
+        model=self.ResponseGenerator.generate(query,schema)
+        try:
+            schema=ResponseSchema(self.data_manager.get_draft_7_schema()).to_dict()
+            unwrapper=SchemaModelUnwrapper(schema=schema, data_manager=self.data_manager)
+            return unwrapper.unwrap(model)
+        except Exception as e:
+            self.data_manager.log_fatal_error(f"Failed to unwrap model: {e}")
+            
+         
 

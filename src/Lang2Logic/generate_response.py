@@ -91,7 +91,8 @@ class ResponseGenerator:
                 self.data_manager.log_fatal_error("Please contact dylanpwilson2005@gmail.com regarding this bug. No schema provided to create validator.")
         except ValidationError as e:
             self.data_manager.log_message("code_error",f"Please contact Please contact dylanpwilson2005@gmail.com regarding this bug. Schema could not be retireved.")
-        schema_dict = self.wrap_root_in_object(schema)
+        schema=ResponseSchema(schema)
+        schema_dict = self.wrap_root_in_object(schema.to_dict())
 
         # Write the schema to a temporary file as a pydantic model
         
@@ -113,6 +114,7 @@ class ResponseGenerator:
                 self.data_manager.log_message("user_error",f"failed to generate pydantic model from schema: {e}")
                 self.data_manager.log_fatal_error(f"failed to generate pydantic model from schema ensure dependencies are up to date and check permisions")
             try:
+                print(f"OUTPUT FILE:{output_file}")
                 #execute the generated module and import the model
                 spec = importlib.util.spec_from_file_location("generated_module", str(output_file))
                 generated_module = importlib.util.module_from_spec(spec)
@@ -161,6 +163,7 @@ class ResponseGenerator:
             dict_output = self.un_wrap_dict(parsed_output.model_dump())
             self.data_manager.log_schema_generation_message(dict_output)
             self.data_manager.set_response(dict_output)
+            self.data_manager.set_schema_generation_success(False)
             return dict_output
         except Exception as e:
             raise Exception (f"Failed to convert to desired object and handle parsed output: {e}")
@@ -174,7 +177,7 @@ class ResponseGenerator:
         except ValueError as e:
             self.data_manager.log_fatal_error(f"Failed to get prompt: {e}")
         try:
-            response=self.retry_parse(output, prompt)
+            response=self.retry_parser(output, prompt)
             self.handle_output(response)
         except Exception as e:
             self.data_manager.log_fatal_error(f"Failed to retry parse: {e}")
@@ -188,15 +191,19 @@ class ResponseGenerator:
             dict_output=self.handle_output(parsed_output)
             return dict_output
         except ValueError as e:
+            self.data_manager.add_try_schema_generation()
             self.data_manager.log_message("warnings",f"Failed to parse output during schema generation\n Error: {e}\nResponse: {output}")
             try:
                 fixed_output = self.fixer.parse(output)
                 self.handle_output(fixed_output)
             except Exception as ex:
+                self.data_manager.add_try_schema_generation()
                 self.data_manager.log_message("warnings",f"Failed to parse output after fixing output during schema generation. \n Error: {e}\nResponse: {output}")
                 try:
                     self.retry_with_error(output)
                 except Exception as ex:
+                    self.data_manager.add_try_schema_generation()
+                    self.data_manager.set_schema_generation_success(False)
                     self.data_manager.log_fatal_error(f"Failed to fix and parse output with prompt. \nOutput:{output} \n Error: {ex}")
         return None
         
@@ -222,6 +229,7 @@ class ResponseGenerator:
             prompt = self.construct_template()
             #make request
             _input = prompt.format_prompt(query=self.data_manager.get_prompt())
+            print(_input.to_string())
         except Exception as e:
             self.data_manager.log_message("code_errors",f"Failed to construct query: {e}")
             self.data_manager.log_fatal_error(f"Failed to construct query: {e}")
@@ -241,7 +249,6 @@ class ResponseGenerator:
         except Exception as e:
             self.data_manager.log_message("warnings",f"Failed to generate response from language model: {e}")
             self.data_manager.log_fatal_error(f"Failed to generate response: {e}")
-        
         return self.retry_parse(output)
      
 

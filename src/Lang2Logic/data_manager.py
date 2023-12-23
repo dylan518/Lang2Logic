@@ -82,7 +82,7 @@ class DataManagement:
             "warnings": [],
             "logs": [],
             "instructions": {
-        "draft-7": "Given the desired output from the instructions generate a draft-7 schema. Example: instructions: create a list of strings where each string is a method in the a bankaccount class draft-7 schema/output: {\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"description\": \"A list of method names for a BankAccount class\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"string\"\n  }\n}"
+        "draft-7": "Given a set of instructions, generate a JSON Schema compliant with the Draft-07 specification for the purpose of defining the output format for a task. Your response must be draft-7 compliant. The schema should accurately reflect the structure and constraints described in the instructions, incorporating new features and changes introduced in Draft-07, such as new keywords `$comment`, `if`, `then`, `else`, `readOnly`, `writeOnly`, `contentMediaType`, and `contentEncoding`. Use `enum` with a single item for constant values."
     },
             "fatal_errors": [],
             "draft_7_schema": None
@@ -121,6 +121,22 @@ class DataManagement:
             self.data[message_type] = [entry]
 
     # Methods allowing edit and read access to data
+    @error_handling
+    def add_try_response_generation(self):
+        self.data['response_process']['response_generation']['tries'] += 1
+    
+    @error_handling
+    def add_try_schema_generation(self):
+        self.data['response_process']['schema_generation']['tries'] += 1
+    
+    @error_handling
+    def set_response_generation_success(self, success):
+        self.data['response_process']['response_generation']['success'] = success
+    
+    @error_handling
+    def set_schema_generation_success(self, success):
+        self.data['response_process']['schema_generation']['success'] = success
+
     @error_handling
     def set_prompt(self, prompt):
         self.data['response_process']['prompt'] = prompt
@@ -168,6 +184,7 @@ class DataManagement:
     
     @error_handling
     def get_draft_7_schema(self):
+        print(self.data['draft_7_schema'])
         return ResponseSchema(self.data['draft_7_schema'])
     
     @error_handling
@@ -224,3 +241,11 @@ class DataManagement:
         except Exception as e:
             # Handle any other exceptions
             raise Exception(f"Error: {e}")
+    
+    @error_handling
+    def pretty_print(self):
+        """Prints the current state of the data in a pretty format."""
+        try:
+            print(json.dumps(self.data, indent=4))
+        except Exception as e:
+            print(f"Error during pretty printing: {e}")

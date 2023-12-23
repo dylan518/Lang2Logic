@@ -22,8 +22,6 @@ class SchemaProperty(BaseModel):
     additionalProperties: Union[bool, 'SchemaProperty'] = True
     required: Optional[List[str]] = None
     enum: Optional[List[Any]] = None
-    const: Optional[Any] = None
-
     # String-specific fields
     maxLength: Optional[int] = None
     minLength: Optional[int] = None
@@ -72,7 +70,7 @@ class SchemaProperty(BaseModel):
     comment: Optional[str] = Field(None, alias='$comment')
 
     class Config:
-        extra = 'allow'
+        extra = 'forbid'
         populate_by_name = True
 
     def dict(self, **kwargs):
@@ -84,6 +82,7 @@ class SchemaProperty(BaseModel):
 class Draft7Schema(BaseModel):
     _raw_data: Optional[Dict[str, Any]] = None
     # Core keywords
+    schema_: Optional[str] = Field(default=None, alias='$schema', format='uri-reference')
     id_: Optional[str] = Field(default=None, alias='$id', format='uri-reference')
     ref_: Optional[str] = Field(None, alias='$ref')
     comment_: Optional[str] = Field(None, alias='$comment')
@@ -140,7 +139,7 @@ class Draft7Schema(BaseModel):
 
     # Additional class configuration
     class Config:
-        extra = 'allow'
+        extra = 'forbid'
         populate_by_name = True
         json_encoders = {
             'SchemaProperty': lambda v: v.dict(by_alias=True,)
@@ -210,13 +209,16 @@ class SchemaGenerator:
     
     def retry_with_error(self,output):
         try:
-            prompt=self.data_manager.get_prompt()
-            if not prompt:
+            prompt=self.construct_template()
+
+            _input = prompt.format_prompt(query=self.data_manager.get_prompt())
+
+            if not _input:
                 self.data_manager.log_fatal_error("Failed to get prompt. Value is None")
         except ValueError as e:
             self.data_manager.log_fatal_error(f"Failed to get prompt: {e}")
         try:
-            response=self.retry_parse(output, prompt)
+            response=self.retry_parser.parse_with_prompt(output, _input.to_string())
             self.handle_output(response)
         except Exception as e:
             self.data_manager.log_fatal_error(f"Failed to retry parse: {e}")
@@ -230,15 +232,18 @@ class SchemaGenerator:
             dict_output=self.handle_output(parsed_output)
             return dict_output
         except ValueError as e:
+            self.data_manager.add_try_schema_generation()
             self.data_manager.log_message("warnings",f"Failed to parse output during schema generation\n Error: {e}\nResponse: {output}")
             try:
                 fixed_output = self.fixer.parse(output)
                 self.handle_output(fixed_output)
             except Exception as ex:
+                self.data_manager.add_try_schema_generation()
                 self.data_manager.log_message("warnings",f"Failed to parse output after fixing output during schema generation. \n Error: {e}\nResponse: {output}")
                 try:
                     self.retry_with_error(output)
                 except Exception as ex:
+                    self.data_manager.set_schema_generation_success(False)
                     self.data_manager.log_fatal_error(f"Failed to fix and parse output with prompt. \nOutput:{output} \n Error: {ex}")
         return None
         
@@ -248,6 +253,7 @@ class SchemaGenerator:
             prompt = self.construct_template()
             #make request
             _input = prompt.format_prompt(query=self.data_manager.get_prompt())
+            print(f"PROMPT{_input.to_string()}")
             prompt=self.data_manager.get_prompt()
             if not _input or not prompt:
                 self.data_manager.log_fatal_error("Failed to get prompt")
