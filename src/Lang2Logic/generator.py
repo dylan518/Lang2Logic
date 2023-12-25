@@ -1,5 +1,4 @@
 import os
-from langchain_community.chat_models import ChatOpenAI
 from langchain.llms import OpenAI
 import warnings
 
@@ -48,8 +47,8 @@ class Generator:
             self.data_manager.log_fatal_error("API key must be a string")
         try:
             os.environ["OPENAI_API_KEY"] = api_key
-            self.chat_model = ChatOpenAI(temperature=0, model_name='gpt-4-1106-preview')
-            self.llm_model = OpenAI(temperature=0, model_name='gpt-4-1106-preview')
+            self.chat_model = OpenAI()
+            self.llm_model = OpenAI()
         except Exception as e:
             self.data_manager.log_fatal_error(f"Failed to initialize models: {e}")
         self.schema_generator = SchemaGenerator(self.llm_model, self.chat_model)
@@ -78,7 +77,6 @@ class Generator:
         self.data_manager.set_prompt(query)
         self.schema_generator.generate_draft_7()
         schema=ResponseSchema(self.data_manager.get_draft_7_schema())
-        self.data_manager.pretty_print()
         return schema
     
     def generate(self, query, schema=None):

@@ -10,7 +10,7 @@ from Lang2Logic.generator import Generator
 
 class TestGenerator(unittest.TestCase):
     def setUp(self):
-        api_key = "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"
+        api_key = "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"
         self.test_gen = Generator(api_key)
 
     def test_generate_integers(self):

@@ -114,7 +114,6 @@ class ResponseGenerator:
                 self.data_manager.log_message("user_error",f"failed to generate pydantic model from schema: {e}")
                 self.data_manager.log_fatal_error(f"failed to generate pydantic model from schema ensure dependencies are up to date and check permisions")
             try:
-                print(f"OUTPUT FILE:{output_file}")
                 #execute the generated module and import the model
                 spec = importlib.util.spec_from_file_location("generated_module", str(output_file))
                 generated_module = importlib.util.module_from_spec(spec)
@@ -229,7 +228,6 @@ class ResponseGenerator:
             prompt = self.construct_template()
             #make request
             _input = prompt.format_prompt(query=self.data_manager.get_prompt())
-            print(_input.to_string())
         except Exception as e:
             self.data_manager.log_message("code_errors",f"Failed to construct query: {e}")
             self.data_manager.log_fatal_error(f"Failed to construct query: {e}")

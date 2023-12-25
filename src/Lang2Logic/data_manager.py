@@ -184,7 +184,6 @@ class DataManagement:
     
     @error_handling
     def get_draft_7_schema(self):
-        print(self.data['draft_7_schema'])
         return ResponseSchema(self.data['draft_7_schema'])
     
     @error_handling

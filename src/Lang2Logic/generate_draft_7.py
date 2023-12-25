@@ -253,7 +253,6 @@ class SchemaGenerator:
             prompt = self.construct_template()
             #make request
             _input = prompt.format_prompt(query=self.data_manager.get_prompt())
-            print(f"PROMPT{_input.to_string()}")
             prompt=self.data_manager.get_prompt()
             if not _input or not prompt:
                 self.data_manager.log_fatal_error("Failed to get prompt")
@@ -264,6 +263,7 @@ class SchemaGenerator:
         try:
             # Generate the response
             response = self.llm_model.generate(prompts=[_input.to_string()])
+            print(response)
             
             # Extract the output text from the response
             if response.generations:
