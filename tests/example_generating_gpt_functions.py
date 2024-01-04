@@ -24,7 +24,8 @@ def read_text_file(file_path):
         return "File not found."
     except Exception as e:
         return f"An error occurred: {e}"
-    
+
+
 def read_json_file(file_path):
     """
     Reads the contents of a JSON file and returns it as a dictionary.
@@ -43,6 +44,7 @@ def read_json_file(file_path):
     except Exception as e:
         return f"An error occurred: {e}"
 
+
 def append_to_json(file_path, new_data):
     """
     Appends new data to an existing JSON file. If the file doesn't exist, it creates a new one.
@@ -53,7 +55,7 @@ def append_to_json(file_path, new_data):
     """
     try:
         # Read the existing data
-        data=read_json_file(file_path)
+        data = read_json_file(file_path)
         # Update with new data
         data.update(new_data)
 
@@ -67,9 +69,8 @@ def append_to_json(file_path, new_data):
         raise (f"An error occurred: {e}")
 
 
-
-gen = Generator("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")
-prompt=""""
+gen = Generator("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")
+prompt = """"
 Task Return a general schema for all gpt functions given these examples. Ensure that the schemas ensure gpt functions are all of type dictionary.
 Determine the schema based off these examples:
 Example one: 
@@ -105,14 +106,22 @@ Example 2:
     } 
   }
 """
-schema=gen.generate_schema(prompt)
-prompts=["write the gpt tool dictionary for a function that takes in bash command, runs it and returns the output of the command. Just outline the gpt-structure as definded schema.", "Write a tool dictionary for a function that allows gpt to upload files to itself. Just outline the gpt-structure as definded schema no need to implement.", "Write a function that allows gpt to run python code. Just outline the gpt-structure as definded schema no need to implement."]
-titles=["run_bash_command", "upload_files", "run_python_code"]
+schema = gen.generate_schema(prompt)
+prompts = [
+    "write the gpt tool dictionary for a function that takes in bash command, runs it and returns the output of the command. Just outline the gpt-structure as definded schema.",
+    "Write a tool dictionary for a function that allows gpt to upload files to itself. Just outline the gpt-structure as definded schema no need to implement.",
+    "Write a function that allows gpt to run python code. Just outline the gpt-structure as definded schema no need to implement."
+]
+titles = ["run_bash_command", "upload_files", "run_python_code"]
 for i in range(len(prompts)):
     try:
-        function_schema=gen.generate(prompts[i],schema)
+        function_schema = gen.generate(prompts[i], schema)
 
     except Exception as e:
         continue
-    function_schema=ResponseSchema(function_schema)
-    function_schema.save_to_json(key=titles[i], filepath='C:\\Users\\dylan\Documents\\GitHub\\Lang2Logic\\tests\\file.json')
+    function_schema = ResponseSchema(function_schema)
+    function_schema.save_to_json(
+        key=titles[i],
+        filepath=
+        'C:\\Users\\dylan\Documents\\GitHub\\Lang2Logic\\tests\\file.json')
+    print(function_schema)

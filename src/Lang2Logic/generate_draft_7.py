@@ -1,7 +1,9 @@
-
 import json
 from typing import Optional, Union, List, Dict, Any
-
+from langchain.output_parsers import PydanticOutputParser
+from langchain.prompts import PromptTemplate
+from langchain_community.chat_models import ChatOpenAI
+from langchain_core.pydantic_v1 import BaseModel, Field, validator
 from pydantic import BaseModel, Field
 from jsonschema import Draft7Validator, exceptions as jsonschema_exceptions
 
@@ -11,7 +13,6 @@ from langchain.prompts import PromptTemplate
 
 #custom imports
 from .data_manager import DataManagement
-
 
 
 class SchemaProperty(BaseModel):
@@ -73,17 +74,16 @@ class SchemaProperty(BaseModel):
         extra = 'forbid'
         populate_by_name = True
 
-    def dict(self, **kwargs):
-        return super().model_dump(by_alias=True, **kwargs)
-
-
-
 
 class Draft7Schema(BaseModel):
     _raw_data: Optional[Dict[str, Any]] = None
     # Core keywords
-    schema_: Optional[str] = Field(default=None, alias='$schema', format='uri-reference')
-    id_: Optional[str] = Field(default=None, alias='$id', format='uri-reference')
+    schema_: Optional[str] = Field(default=None,
+                                   alias='$schema',
+                                   format='uri-reference')
+    id_: Optional[str] = Field(default=None,
+                               alias='$id',
+                               format='uri-reference')
     ref_: Optional[str] = Field(None, alias='$ref')
     comment_: Optional[str] = Field(None, alias='$comment')
 
@@ -93,7 +93,8 @@ class Draft7Schema(BaseModel):
     additionalProperties: Union[bool, SchemaProperty] = True
     required: Optional[List[str]] = None
     patternProperties: Optional[Dict[str, 'SchemaProperty']] = None
-    dependencies: Optional[Dict[str, Union[List[str], 'SchemaProperty']]] = None
+    dependencies: Optional[Dict[str, Union[List[str],
+                                           'SchemaProperty']]] = None
     minProperties: Optional[int] = None
     maxProperties: Optional[int] = None
 
@@ -141,12 +142,7 @@ class Draft7Schema(BaseModel):
     class Config:
         extra = 'forbid'
         populate_by_name = True
-        json_encoders = {
-            'SchemaProperty': lambda v: v.dict(by_alias=True,)
-        }
-
-    def dict(self, **kwargs):
-        return super().model_dump(**kwargs, by_alias=True,exclude_none=True)
+        json_encoders = {'SchemaProperty': lambda v: v.dict(by_alias=True, )}
 
     def __init__(self, **data):
         # Perform JSON Schema Draft-7 validation on the input data
@@ -159,129 +155,124 @@ class Draft7Schema(BaseModel):
         super().__init__(**data)
 
     def to_json(self, **kwargs):
-        return super().model_dump_json(by_alias=True, exclude_none=True, **kwargs)
-    
-
-
-
-
-
+        return super().json(by_alias=True, exclude_none=True, **kwargs)
 
 
 class SchemaGenerator:
 
-    def __init__(self,llm_model,chat_model):
-        self.data_manager=DataManagement()
-        self.llm_model =llm_model
-        self.chat_model=chat_model
+    def __init__(self, llm_model, chat_model):
+        self.data_manager = DataManagement()
+        self.llm_model = llm_model
+        self.chat_model = chat_model
         self.parser = PydanticOutputParser(pydantic_object=Draft7Schema)
-        self.fixer = OutputFixingParser.from_llm(parser=self.parser, llm=self.chat_model)
-        self.retry_parser=RetryWithErrorOutputParser.from_llm(parser=self.parser, llm=self.chat_model)
-        self.data_manager=DataManagement()
+        self.fixer = OutputFixingParser.from_llm(parser=self.parser,
+                                                 llm=self.chat_model)
+        self.retry_parser = RetryWithErrorOutputParser.from_llm(
+            parser=self.parser, llm=self.chat_model)
+        self.data_manager = DataManagement()
 
     def construct_template(self):
-        instructions=self.data_manager.get_instruction_by_key("draft-7")
+        instructions = self.data_manager.get_instruction_by_key("draft-7")
         # Construct the prompt
         prompt = PromptTemplate(
-            template="Based off of this task: \n{query}\nRequest: \n{format_instructions}\n",
+            template=
+            "Based off of this task: \n{query}\nRequest: \n{format_instructions}\n",
             input_variables=["query"],
-            partial_variables={
-                "format_instructions": instructions
-            },
+            partial_variables={"format_instructions": instructions},
         )
         return prompt
-    def validate_schema(self,output):
+
+    def validate_schema(self, output):
         if not self.data_manager.validate_draft_7_schema(output):
-            self.data_manager.log_message("code_errors",f"The validation allowed a non-valid response please contact dylanpwilson2005@gmail.com regarding the bug. fixed_output: {output} schema: {self.data_manager.get_draft_7_schema()}")
-            self.data_manager.log_fatal_error("The validation allowed a non-valid response please contact dylanpwilson2005@gmail.com regarding the bug")
+            self.data_manager.log_message(
+                "code_errors",
+                f"The validation allowed a non-valid response please contact dylanpwilson2005@gmail.com regarding the bug. fixed_output: {output} schema: {self.data_manager.get_draft_7_schema()}"
+            )
+            self.data_manager.log_fatal_error(
+                "The validation allowed a non-valid response please contact dylanpwilson2005@gmail.com regarding the bug"
+            )
             return False
         return True
-    
-    def handle_output(self,output):
-        dict_output=output.dict()
+
+    def handle_output(self, output):
+        dict_output = output.dict(by_alias=True, exclude_none=True)
         if not dict_output:
-            raise ValueError("Schema is empty")  
+            raise ValueError("Schema is empty")
         self.data_manager.log_schema_generation_message(str(dict_output))
         if not self.validate_schema(dict_output):
-            raise ValueError("Invalid schema")            
+            raise ValueError("Invalid schema")
         self.data_manager.set_draft_7_schema(dict_output)
         return dict_output
-    
-    def retry_with_error(self,output):
-        try:
-            prompt=self.construct_template()
 
+    def retry_with_error(self, output):
+        try:
+            prompt = self.construct_template()
+            #make request
             _input = prompt.format_prompt(query=self.data_manager.get_prompt())
-
-            if not _input:
-                self.data_manager.log_fatal_error("Failed to get prompt. Value is None")
-        except ValueError as e:
-            self.data_manager.log_fatal_error(f"Failed to get prompt: {e}")
-        try:
-            response=self.retry_parser.parse_with_prompt(output, _input.to_string())
+            response = self.retry_parser.parse_with_prompt(output, _input)
             self.handle_output(response)
         except Exception as e:
             self.data_manager.log_fatal_error(f"Failed to retry parse: {e}")
-        
 
-
-        
-    def retry_parse(self,output):
+    def retry_parse(self, output):
         try:
             parsed_output = self.parser.parse(output)
-            dict_output=self.handle_output(parsed_output)
+            dict_output = self.handle_output(parsed_output)
             return dict_output
         except ValueError as e:
             self.data_manager.add_try_schema_generation()
-            self.data_manager.log_message("warnings",f"Failed to parse output during schema generation\n Error: {e}\nResponse: {output}")
+            self.data_manager.log_message(
+                "warnings",
+                f"Failed to parse output during schema generation\n Error: {e}\nResponse: {output}"
+            )
             try:
                 fixed_output = self.fixer.parse(output)
-                self.handle_output(fixed_output)
+                dict_output = self.handle_output(fixed_output)
+                return dict_output
             except Exception as ex:
                 self.data_manager.add_try_schema_generation()
-                self.data_manager.log_message("warnings",f"Failed to parse output after fixing output during schema generation. \n Error: {e}\nResponse: {output}")
+                self.data_manager.log_message(
+                    "warnings",
+                    f"Failed to parse output after fixing output during schema generation. \n Error: {e}\nResponse: {output}"
+                )
+                print(
+                    "warnings",
+                    f"Failed to parse output after fixing output during schema generation. \n Error: {e}\nResponse: {output}"
+                )
                 try:
                     self.retry_with_error(output)
                 except Exception as ex:
                     self.data_manager.set_schema_generation_success(False)
-                    self.data_manager.log_fatal_error(f"Failed to fix and parse output with prompt. \nOutput:{output} \n Error: {ex}")
+                    self.data_manager.log_fatal_error(
+                        f"Failed to fix and parse output with prompt. \nOutput:{output} \n Error: {ex}"
+                    )
+        self.data_manager.log_fatal_error(
+            f"Failed to fix and parse output with prompt. \nOutput:{output} \n Error: {ex}"
+        )
         return None
-        
+
     def generate_draft_7(self):
         try:
             # Construct the query
             prompt = self.construct_template()
             #make request
             _input = prompt.format_prompt(query=self.data_manager.get_prompt())
-            prompt=self.data_manager.get_prompt()
+            prompt = self.data_manager.get_prompt()
             if not _input or not prompt:
                 self.data_manager.log_fatal_error("Failed to get prompt")
         except Exception as e:
-            self.data_manager.log_message("code_errors",f"Failed to construct query: {e}")
-            self.data_manager.log_fatal_error(f"Failed to construct query: {e}")
-            
+            self.data_manager.log_message("code_errors",
+                                          f"Failed to construct query: {e}")
+            self.data_manager.log_fatal_error(
+                f"Failed to construct query: {e}")
+
         try:
-            # Generate the response
-            response = self.llm_model.generate(prompts=[_input.to_string()])
-            print(response)
-            
-            # Extract the output text from the response
-            if response.generations:
-                output = response.generations[0][0].text  # Accessing the first Generation object's text
-                self.data_manager.log_schema_generation_message(output)
-                self.data_manager.log_schema_generation_message(output)
-            else:
-                output = ""
-                self.data_manager.log_fatal_error("The language model did not generate output for the schema generation")
+            # Generate the respons
+            response = self.chat_model.invoke(_input.to_string())
+            print(response.content)
+            return self.retry_parse(response.content)
+
         except Exception as e:
-            self.data_manager.log_message("warnings",f"Failed to generate response from language model: {e}")
-            self.data_manager.log_fatal_error(f"Failed to generate response: {e}")
-        
-        
-        return self.retry_parse(output)
-    
-
-
-
-        
-
+            self.data_manager.log_message(
+                "warnings", f"Failed parse  response from language model: {e}")
+            self.data_manager.log_fatal_error(f"failed to fix drat-7ERROR{e}")

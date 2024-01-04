@@ -22,10 +22,10 @@ import os
 from Lang2Logic.generator import Generator
 
 # Initialize with API key
-self.test_gen = Generator(os.environ.get("YOUR_API_KEY"))
+test_gen = Generator(os.environ.get("YOUR_API_KEY"))
 
 # Generate schema from natural language
-schema = self.test_gen.generate_schema("return a list of strings")
+schema = test_gen.generate_schema("return a list of strings")
 
 # The 'schema' here is an instance of the ResponseSchema class
 ```
@@ -67,7 +67,7 @@ schema.save_to_json(key="mySchema", filepath="path/to/file.json")
 ### Automatic Schema Generation
 
 ```python
-self.test_gen.generate("return a list of strings with 5 colors")
+test_gen.generate("return a list of strings with 5 colors")
 # The output is an instance of ResponseSchema
 # Output: ["color1", "color2", "color3", "color4", "color5"]
 ```
@@ -77,11 +77,11 @@ self.test_gen.generate("return a list of strings with 5 colors")
 #### Classifying Decisions and Preferences
 
 ```python
-schema = self.test_gen.generate_schema("return a dictionary with keys 'rational' and 'decision' (boolean)")
+schema = test_gen.generate_schema("return a dictionary with keys 'rational' and 'decision' (boolean)")
 
 potential_buyers = []
 for user in users_data_json["bios"]:
-    decision = self.test_gen.generate(f"return true if this user might be interested in products related to rock climbing.\nUser Bio:\n{user['bio']}", schema)
+    decision = test_gen.generate(f"return true if this user might be interested in products related to rock climbing.\nUser Bio:\n{user['bio']}", schema)
     if decision["decision"]:
         potential_buyers.append(user)
 ```
