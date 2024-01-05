@@ -6,9 +6,9 @@ from pydantic import ValidationError
 from pathlib import Path
 import subprocess
 from pydantic import BaseModel
-from typing import Type, Any
+from typing import Type, Any, List
 from typing import ForwardRef, _eval_type, List, Dict
-
+import traceback
 import sys
 from langchain.output_parsers import OutputFixingParser, PydanticOutputParser, RetryWithErrorOutputParser
 
@@ -153,38 +153,35 @@ class ResponseGenerator:
             return None
         self.generated_pydantic_model = self.import_generated_models(
             output_file)
+        print(self.generated_pydantic_model)
 
         return self.generated_pydantic_model
 
-    def import_generated_models(self, output_file):
+    def import_generated_models(self, output_file, model_name='Model'):
         try:
+            # Load the generated module
             spec = importlib.util.spec_from_file_location(
                 "generated_module", str(output_file))
             generated_module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(generated_module)
 
-            # Collect all BaseModel subclasses
-            all_models = {}
-            for attr_name in dir(generated_module):
-                attr = getattr(generated_module, attr_name)
-                if isinstance(attr, type) and issubclass(
-                        attr, BaseModel) and attr != BaseModel:
-                    all_models[attr_name] = attr
+            # Prepare a local namespace with all types from the generated module
+            localns = {
+                name: getattr(generated_module, name)
+                for name in dir(generated_module) if not name.startswith('_')
+            }
 
-            # Identify the top-level model
-            top_level_model = self.find_top_level_model(all_models)
-            print(top_level_model)
-            if not top_level_model:
-                self.data_manager.log_fatal_error(
-                    "No top-level BaseModel subclass found in the generated file."
-                )
-                return None
+            # Update forward references for each Pydantic model
+            for name, model in localns.items():
+                if isinstance(model, type) and issubclass(model, BaseModel):
+                    model.update_forward_refs(**localns)
 
-            return top_level_model
-        except Exception as e:
+            # Return the specified model by name, if it exists
+            print(localns)
+            return localns.get(model_name)
+        except:
             self.data_manager.log_fatal_error(
-                f"Error importing generated models: {e}")
-            return None
+                "couldnt import generated modules")
 
     def find_top_level_model(self, all_models):
         referenced_models = set()
@@ -210,6 +207,7 @@ class ResponseGenerator:
 
     def construct_template(self):
         # Construct the prompt
+        print(f"parser{self.parser}")
         prompt = PromptTemplate(
             template=
             "Return the desired value for this query in the correct format.\n{format_instructions}\n{query}\n",
@@ -240,7 +238,7 @@ class ResponseGenerator:
         if not parsed_output:
             self.data_manager.log_fatal_error("Parsed output is empty")
         try:
-            dict_output = self.un_wrap_dict(parsed_output.model_dump())
+            dict_output = self.un_wrap_dict(parsed_output.dict())
             self.data_manager.log_schema_generation_message(dict_output)
             self.data_manager.set_response(dict_output)
             self.data_manager.set_schema_generation_success(False)
@@ -321,7 +319,6 @@ class ResponseGenerator:
             # Construct the query
             prompt = self.construct_template()
             #make request
-            _input = prompt.format_prompt(query=self.data_manager.get_prompt())
         except Exception as e:
             self.data_manager.log_message("code_errors",
                                           f"Failed to construct query: {e}")
@@ -330,6 +327,7 @@ class ResponseGenerator:
 
         try:
             # Generate the response
+            _input = prompt.format_prompt(query=self.data_manager.get_prompt())
             response = self.chat_model.invoke(_input.to_string(),
                                               max_tokens=3000)
 
@@ -341,4 +339,5 @@ class ResponseGenerator:
                 "warnings",
                 f"Failed to generate response from language model: {e}")
             self.data_manager.log_fatal_error(
-                f"Failed to generate response: {e}")
+                f"Failed to generate response: {e}TRACEBACK{traceback.format_exc()}"
+            )
