@@ -157,46 +157,52 @@ class ResponseGenerator:
 
         return self.generated_pydantic_model
 
-    def import_generated_models(self, output_file, model_name='Model'):
+    def import_generated_models(self, output_file):
         try:
-            # Load the generated module
-            spec = importlib.util.spec_from_file_location(
-                "generated_module", str(output_file))
-            generated_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(generated_module)
+            # Execute the entire Python file
+            namespace = {}
+            with open(output_file, "r") as file:
+                exec(file.read(), namespace)
 
-            # Prepare a local namespace with all types from the generated module
-            localns = {
-                name: getattr(generated_module, name)
-                for name in dir(generated_module) if not name.startswith('_')
+            # Collect only Pydantic models from the namespace
+            all_models: Dict[str, Type[BaseModel]] = {
+                name: cls
+                for name, cls in namespace.items()
+                if isinstance(cls, type) and issubclass(cls, BaseModel)
             }
+            print(f"ALL MODELS{all_models}")
+            top_level_model = self.find_top_level_model(all_models)
+            if top_level_model:
+                top_level_model.update_forward_refs()
+            if not top_level_model:
+                self.data_manager.log_fatal_error("failed to get top level")
 
-            # Update forward references for each Pydantic model
-            for name, model in localns.items():
-                if isinstance(model, type) and issubclass(model, BaseModel):
-                    model.update_forward_refs(**localns)
+            print(top_level_model.schema())
 
-            # Return the specified model by name, if it exists
-            print(localns)
-            return localns.get(model_name)
-        except:
+            return top_level_model
+        except Exception as e:
             self.data_manager.log_fatal_error(
-                "couldnt import generated modules")
+                f"Error importing generated models: {e}TRACEBACK{traceback.format_exc()}"
+            )
+            return None
 
-    def find_top_level_model(self, all_models):
+    def find_top_level_model(self, all_models: Dict[str, Type[BaseModel]]):
         referenced_models = set()
+        print(f"all_models{all_models}")
 
         # Collect all models that are referenced in other models
+        all_models.pop('BaseModel', None)
         for model in all_models.values():
-            for field in model.__fields__.values():
-                field_type = field.type_
+            for field_name, field in model.__fields__.items():
+                print(field)
+                field_type = self.get_field_type(field)
                 if field_type in all_models.values():
                     referenced_models.add(field_type)
                 if hasattr(field_type, '__args__'):
                     for arg in getattr(field_type, '__args__', []):
                         if arg in all_models.values():
                             referenced_models.add(arg)
-
+        print(all_models.values())
         # Identify top-level models (not referenced by any other model)
         top_level_models = [
             model for model in all_models.values()
@@ -217,6 +223,14 @@ class ResponseGenerator:
             },
         )
         return prompt
+
+    def get_field_type(self, field: Any) -> Type[Any]:
+        if hasattr(field, 'type_'):
+            return field.type_
+        elif hasattr(field, 'outer_type_'):
+            return field.outer_type_
+        else:
+            return type(field)
 
     def un_wrap_dict(self, dict_object):
         """
@@ -241,7 +255,7 @@ class ResponseGenerator:
             dict_output = self.un_wrap_dict(parsed_output.dict())
             self.data_manager.log_schema_generation_message(dict_output)
             self.data_manager.set_response(dict_output)
-            self.data_manager.set_schema_generation_success(False)
+            self.data_manager.set_schema_generation_success(True)
             return dict_output
         except Exception as e:
             raise Exception(
@@ -257,10 +271,13 @@ class ResponseGenerator:
         except ValueError as e:
             self.data_manager.log_fatal_error(f"Failed to get prompt: {e}")
         try:
-            response = self.retry_parser(output, prompt)
+            _input = prompt.format_prompt(query=self.data_manager.get_prompt())
+            response = self.retry_parser.parse_with_prompt(output, _input)
             self.handle_output(response)
         except Exception as e:
-            self.data_manager.log_fatal_error(f"Failed to retry parse: {e}")
+            self.data_manager.log_fatal_error(
+                f"Failed to retry parse: {e} TRACEBACK: TRACEBACK{traceback.format_exc()}"
+            )
 
     def retry_parse(self, output):
         try:
@@ -275,7 +292,8 @@ class ResponseGenerator:
             )
             try:
                 fixed_output = self.fixer.parse(output)
-                self.handle_output(fixed_output)
+                dict_output = self.handle_output(fixed_output)
+                return dict_output
             except Exception as ex:
                 self.data_manager.add_try_schema_generation()
                 self.data_manager.log_message(

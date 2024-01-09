@@ -90,7 +90,7 @@ class DataManagement:
             "logs": [],
             "instructions": {
                 "draft-7":
-                "Given a set of instructions, generate a JSON Schema compliant with the Draft-07 specification for the purpose of defining the output format for a task. Your response must be draft-7 compliant. The schema should accurately reflect the structure and constraints. Use `enum` with a single item for constant values. Only return the Draft-07 Json and no other "
+                "Given a set of instructions, generate a JSON Schema compliant with the Draft-07 specification for the purpose of defining the output format for a task. Your response must be draft-7 compliant. The schema should accurately reflect the structure and constraints. Use `enum` with a single item for constant values. Only return the Draft-07 Json and no other. Unique and Regex items not allowed "
             },
             "fatal_errors": [],
             "draft_7_schema": None

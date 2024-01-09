@@ -105,6 +105,6 @@ class Generator:
                 self.data_manager.get_draft_7_schema()).to_dict()
             unwrapper = SchemaModelUnwrapper(schema=schema,
                                              data_manager=self.data_manager)
-            return unwrapper.unwrap(model)
+            return model
         except Exception as e:
             self.data_manager.log_fatal_error(f"Failed to unwrap model: {e}")

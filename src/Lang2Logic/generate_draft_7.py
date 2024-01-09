@@ -6,6 +6,7 @@ from langchain_community.chat_models import ChatOpenAI
 from langchain_core.pydantic_v1 import BaseModel, Field, validator
 from pydantic import BaseModel, Field
 from jsonschema import Draft7Validator, exceptions as jsonschema_exceptions
+import traceback
 
 from langchain.llms import OpenAI
 from langchain.output_parsers import OutputFixingParser, PydanticOutputParser, RetryWithErrorOutputParser
@@ -26,7 +27,7 @@ class SchemaProperty(BaseModel):
     # String-specific fields
     maxLength: Optional[int] = None
     minLength: Optional[int] = None
-    pattern: Optional[str] = None
+    #pattern: Optional[str] = None
 
     # Numeric-specific fields
     maximum: Optional[Union[int, float]] = None
@@ -38,7 +39,7 @@ class SchemaProperty(BaseModel):
     # Array-specific fields
     maxItems: Optional[int] = None
     minItems: Optional[int] = None
-    uniqueItems: Optional[bool] = None
+    #uniqueItems: Optional[bool] = None
 
     # Object-specific fields
     maxProperties: Optional[int] = None
@@ -71,7 +72,7 @@ class SchemaProperty(BaseModel):
     comment: Optional[str] = Field(None, alias='$comment')
 
     class Config:
-        extra = 'forbid'
+        extra = 'allow'
         populate_by_name = True
 
 
@@ -101,7 +102,7 @@ class Draft7Schema(BaseModel):
     # String validation keywords
     minLength: Optional[int] = None
     maxLength: Optional[int] = None
-    pattern: Optional[str] = None
+    #pattern: Optional[str] = None
     format: Optional[str] = None  # Includes the new formats from Draft-07
 
     # Number validation keywords
@@ -116,7 +117,7 @@ class Draft7Schema(BaseModel):
     additionalItems: Union[bool, 'SchemaProperty'] = True
     minItems: Optional[int] = None
     maxItems: Optional[int] = None
-    uniqueItems: Optional[bool] = None
+    #uniqueItems: Optional[bool] = None
 
     # Conditional subschemas (Draft-07)
     if_: Optional['SchemaProperty'] = Field(None, alias='if')
@@ -140,7 +141,7 @@ class Draft7Schema(BaseModel):
 
     # Additional class configuration
     class Config:
-        extra = 'forbid'
+        extra = 'allow'
         populate_by_name = True
         json_encoders = {'SchemaProperty': lambda v: v.dict(by_alias=True, )}
 
@@ -168,7 +169,7 @@ class SchemaGenerator:
         self.fixer = OutputFixingParser.from_llm(parser=self.parser,
                                                  llm=self.chat_model)
         self.retry_parser = RetryWithErrorOutputParser.from_llm(
-            parser=self.parser, llm=self.chat_model)
+            parser=self.parser, llm=self.chat_model, max_retries=3)
         self.data_manager = DataManagement()
 
     def construct_template(self):
@@ -178,7 +179,10 @@ class SchemaGenerator:
             template=
             "Based off of this task: \n{query}\nRequest: \n{format_instructions}\n",
             input_variables=["query"],
-            partial_variables={"format_instructions": instructions},
+            partial_variables={
+                "format_instructions": instructions,
+                "format_schema": self.parser.get_format_instructions()
+            },
         )
         return prompt
 
@@ -208,11 +212,11 @@ class SchemaGenerator:
         try:
             prompt = self.construct_template()
             #make request
-            _input = prompt.format_prompt(query=self.data_manager.get_prompt())
-            response = self.retry_parser.parse_with_prompt(output, _input)
+            response = self.retry_parser.parse_with_prompt(output, prompt)
             self.handle_output(response)
         except Exception as e:
-            self.data_manager.log_fatal_error(f"Failed to retry parse: {e}")
+            self.data_manager.log_fatal_error(
+                f"Failed to retry parse: {e} TRACEBACK")
 
     def retry_parse(self, output):
         try:
@@ -220,6 +224,7 @@ class SchemaGenerator:
             dict_output = self.handle_output(parsed_output)
             return dict_output
         except ValueError as e:
+            print(e)
             self.data_manager.add_try_schema_generation()
             self.data_manager.log_message(
                 "warnings",
