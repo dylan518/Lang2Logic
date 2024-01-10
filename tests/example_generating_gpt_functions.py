@@ -69,7 +69,7 @@ def append_to_json(file_path, new_data):
         raise (f"An error occurred: {e}")
 
 
-gen = Generator("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")
+gen = Generator("YOUR-API-KEY")
 prompt = """"
 Task Return a general schema for all gpt functions given these examples. Ensure that the schemas ensure gpt functions are all of type dictionary.
 Determine the schema based off these examples:

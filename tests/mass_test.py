@@ -9,8 +9,8 @@ class Lang2LogicTests:
             "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")
 
     def run_tests(self):
-        #self.test_basic_list_generation()
-        #self.test_dictionary_generation()
+        self.test_basic_list_generation()
+        self.test_dictionary_generation()
         self.test_nested_structure_generation()
         self.test_automatic_schema_generation()
         self.test_decision_classifying()

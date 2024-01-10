@@ -224,7 +224,6 @@ class SchemaGenerator:
             dict_output = self.handle_output(parsed_output)
             return dict_output
         except ValueError as e:
-            print(e)
             self.data_manager.add_try_schema_generation()
             self.data_manager.log_message(
                 "warnings",
@@ -237,10 +236,6 @@ class SchemaGenerator:
             except Exception as ex:
                 self.data_manager.add_try_schema_generation()
                 self.data_manager.log_message(
-                    "warnings",
-                    f"Failed to parse output after fixing output during schema generation. \n Error: {e}\nResponse: {output}"
-                )
-                print(
                     "warnings",
                     f"Failed to parse output after fixing output during schema generation. \n Error: {e}\nResponse: {output}"
                 )
@@ -274,7 +269,6 @@ class SchemaGenerator:
         try:
             # Generate the respons
             response = self.chat_model.invoke(_input.to_string())
-            print(response.content)
             return self.retry_parse(response.content)
 
         except Exception as e:

@@ -141,7 +141,6 @@ class ResponseGenerator:
                     str(output_file)
                 ],
                                check=True)
-                print(f"Generated Pydantic models at: {output_file}")
         except Exception as e:
             self.data_manager.log_message(
                 "code_error", f"Failed to generate Pydantic models: {e}")
@@ -153,8 +152,6 @@ class ResponseGenerator:
             return None
         self.generated_pydantic_model = self.import_generated_models(
             output_file)
-        print(self.generated_pydantic_model)
-
         return self.generated_pydantic_model
 
     def import_generated_models(self, output_file):
@@ -170,14 +167,11 @@ class ResponseGenerator:
                 for name, cls in namespace.items()
                 if isinstance(cls, type) and issubclass(cls, BaseModel)
             }
-            print(f"ALL MODELS{all_models}")
             top_level_model = self.find_top_level_model(all_models)
             if top_level_model:
                 top_level_model.update_forward_refs()
             if not top_level_model:
                 self.data_manager.log_fatal_error("failed to get top level")
-
-            print(top_level_model.schema())
 
             return top_level_model
         except Exception as e:
@@ -188,21 +182,20 @@ class ResponseGenerator:
 
     def find_top_level_model(self, all_models: Dict[str, Type[BaseModel]]):
         referenced_models = set()
-        print(f"all_models{all_models}")
-
         # Collect all models that are referenced in other models
         all_models.pop('BaseModel', None)
+        all_models.pop('RootItem', None)
         for model in all_models.values():
-            for field_name, field in model.__fields__.items():
-                print(field)
+            for field in model.__fields__.values():
                 field_type = self.get_field_type(field)
                 if field_type in all_models.values():
                     referenced_models.add(field_type)
+
+                # Handling generic types
                 if hasattr(field_type, '__args__'):
-                    for arg in getattr(field_type, '__args__', []):
+                    for arg in field_type.__args__:
                         if arg in all_models.values():
                             referenced_models.add(arg)
-        print(all_models.values())
         # Identify top-level models (not referenced by any other model)
         top_level_models = [
             model for model in all_models.values()
@@ -213,7 +206,6 @@ class ResponseGenerator:
 
     def construct_template(self):
         # Construct the prompt
-        print(f"parser{self.parser}")
         prompt = PromptTemplate(
             template=
             "Return the desired value for this query in the correct format.\n{format_instructions}\n{query}\n",
@@ -350,7 +342,6 @@ class ResponseGenerator:
                                               max_tokens=3000)
 
             # Generate the respons
-            print(response.content)
             return self.retry_parse(response.content)
         except Exception as e:
             self.data_manager.log_message(

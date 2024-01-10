@@ -14,7 +14,7 @@ class TestSchemaGenerator(unittest.TestCase):
 
     def setUp(self):
         self.test_gen = Generator(
-            "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")
+            "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")
 
     def test_schema_for_list_of_strings(self):
         # Using a simple question that should result in a list of strings schema

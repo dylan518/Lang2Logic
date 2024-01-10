@@ -1,4 +1,19 @@
 from setuptools import setup, find_packages
+from setuptools.command.install import install
+import subprocess
+
+
+class CustomInstall(install):
+
+    def run(self):
+        # Call the parent method
+        install.run(self)
+        # Custom post-install code to install improved-datamodel-codegen with no dependencies
+        subprocess.call([
+            'pip', 'install', 'improved-datamodel-codegen==1.2.1', '--no-deps'
+        ])
+
+
 # Read dependencies from requirements.txt
 with open('requirements.txt') as f:
     required = f.read().splitlines()
@@ -9,7 +24,7 @@ with open('README.md', 'r', encoding='utf-8') as f:
 
 setup(
     name='Lang2Logic',
-    version='1.1.6',
+    version='1.2.0',
     description=
     'A package for generating, validating, and utilizing Draft-7 JSON schemas with LangChain',
     long_description=long_description,
@@ -37,4 +52,7 @@ setup(
         'test': ['coverage'],
     },
     project_urls={},
+    cmdclass={
+        'install': CustomInstall,
+    },
 )
